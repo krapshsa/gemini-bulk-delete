@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      2.1.0
+// @version      2.1.1
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -23,6 +23,16 @@
             ''
         );
         GM_addStyle(rules);
+    }
+
+    function isolateCheckboxEvents(checkbox) {
+        for (const eventName of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click']) {
+            checkbox.addEventListener(eventName, event => event.stopPropagation());
+        }
+        checkbox.addEventListener('dblclick', event => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
     }
 
     // =========================================================================
@@ -196,7 +206,15 @@
         injectCheckboxes() {
             for (const link of this.conversationLinks()) {
                 const id = this.conversationId(link);
-                if (!id || link.hasAttribute(PROCESSED_ATTRIBUTE)) continue;
+                if (!id) continue;
+
+                const existingCheckbox = link.querySelector(`.${ITEM_CHECKBOX_CLASS}`);
+                if (existingCheckbox) {
+                    existingCheckbox.checked = this.selected.has(id);
+                    link.toggleAttribute(PROCESSED_ATTRIBUTE, true);
+                    link.classList.toggle(SELECTED_CLASS, existingCheckbox.checked);
+                    continue;
+                }
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
@@ -204,7 +222,7 @@
                 checkbox.checked = this.selected.has(id);
                 checkbox.title = 'Select conversation';
                 checkbox.setAttribute('aria-label', `Select ${link.textContent.trim() || 'conversation'}`);
-                checkbox.addEventListener('click', event => event.stopPropagation());
+                isolateCheckboxEvents(checkbox);
                 checkbox.addEventListener('change', event => this.handleItemChange(event, id));
 
                 link.prepend(checkbox);
@@ -229,7 +247,7 @@
             selectAll.className = `${CHECKBOX_CLASS} ${SELECT_ALL_CLASS}`;
             selectAll.title = 'Select all visible conversations';
             selectAll.setAttribute('aria-label', 'Select all visible conversations');
-            selectAll.addEventListener('click', event => event.stopPropagation());
+            isolateCheckboxEvents(selectAll);
             selectAll.addEventListener('change', event => this.handleSelectAll(event));
 
             const toolbar = document.createElement('span');
