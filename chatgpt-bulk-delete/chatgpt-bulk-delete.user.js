@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      3.0.2
+// @version      3.0.5
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -70,7 +70,10 @@
             transform: translateY(-50%);
         }
 
-        .${CLASS.row} > a[href^="/c/"] {
+        /* Reserve checkbox space both before sync() decorates a new link and
+           while ChatGPT replaces that link with its inline title editor. */
+        nav a[href^="/c/"],
+        .${CLASS.row} > .${CLASS.itemCheckbox} + * {
             padding-inline-start: 36px !important;
         }
 
