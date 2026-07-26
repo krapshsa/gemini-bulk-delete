@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      3.0.5
+// @version      3.0.6
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -354,10 +354,11 @@
         }
 
         visibleIds() {
-            return this.links()
+            return [...document.querySelectorAll(`.${CLASS.itemCheckbox}`)]
                 .filter(isVisible)
-                .map(link => this.idOf(link))
-                .filter(Boolean);
+                .map(checkbox => checkbox.dataset.conversationId)
+                .filter(Boolean)
+                .filter((id, index, ids) => ids.indexOf(id) === index);
         }
 
         render() {
