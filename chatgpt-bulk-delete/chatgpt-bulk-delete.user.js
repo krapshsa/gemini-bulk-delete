@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      3.0.10
+// @version      3.0.12
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -25,7 +25,8 @@
     };
 
     const SELECTOR = {
-        conversation: 'nav a[href^="/c/"]',
+        history: '#history',
+        conversation: 'a[href^="/c/"]',
         options: [
             'button[aria-label^="Open conversation options for"]',
             'button[data-testid*="conversation-options"]',
@@ -72,7 +73,7 @@
 
         /* Reserve checkbox space both before sync() decorates a new link and
            while ChatGPT replaces that link with its inline title editor. */
-        nav a[href^="/c/"],
+        #history a[href^="/c/"],
         .${CLASS.row} > .${CLASS.itemCheckbox} + * {
             padding-inline-start: 36px !important;
         }
@@ -217,10 +218,10 @@
         }
 
         links() {
-            const candidates = [...document.querySelectorAll(SELECTOR.conversation)];
-            const firstLink = candidates.find(isVisible) ?? candidates[0];
-            const nav = firstLink?.closest('nav');
-            return nav ? [...nav.querySelectorAll('a[href^="/c/"]')] : [];
+            const historyRoot = document.querySelector(SELECTOR.history);
+            return historyRoot
+                ? [...historyRoot.querySelectorAll(SELECTOR.conversation)]
+                : [];
         }
 
         idOf(link) {
@@ -253,7 +254,7 @@
                 }
             }
 
-            this.ensureToolbar(links[0]);
+            this.ensureToolbar();
             this.render();
         }
 
@@ -276,7 +277,7 @@
             return checkbox;
         }
 
-        ensureToolbar(firstLink) {
+        ensureToolbar() {
             if (this.toolbar?.isConnected) {
                 return;
             }
@@ -285,7 +286,7 @@
             this.deleteButton = null;
             this.selectAll = null;
 
-            const anchor = this.findToolbarAnchor(firstLink);
+            const anchor = this.findToolbarAnchor();
             if (!anchor) {
                 return;
             }
@@ -331,47 +332,18 @@
             this.selectAll = selectAll;
         }
 
-        findToolbarAnchor(firstLink) {
-            const nav = firstLink?.closest('nav');
-            if (!nav) {
-                return null;
-            }
-
-            const buttons = [...nav.querySelectorAll('button')];
-            const sectionHeaders = buttons.filter(button => {
-                return button.hasAttribute('aria-expanded')
-                    && Boolean(button.querySelector('h2'));
-            });
-            const conversationSectionHeaders = sectionHeaders.filter(button => {
-                const section = button.closest(
-                    '[class~="group/sidebar-expando-section"]'
-                );
-                return Boolean(section?.querySelector('a[href^="/c/"]'));
-            });
-            if (conversationSectionHeaders.length > 0) {
-                return conversationSectionHeaders.at(-1);
-            }
-            if (sectionHeaders.length > 0) {
-                return sectionHeaders.at(-1);
-            }
-
-            const recents = buttons.find(button => {
-                return /^(Recents|最近|近期|最近使用)$/.test(button.textContent.trim());
-            });
-            if (recents) {
-                return recents;
-            }
-
-            return buttons.filter(button => {
-                return Boolean(
-                    button.compareDocumentPosition(firstLink)
-                    & Node.DOCUMENT_POSITION_FOLLOWING
-                );
-            }).at(-1) ?? null;
+        findToolbarAnchor() {
+            const historyRoot = document.querySelector(SELECTOR.history);
+            const historyHeader = historyRoot?.previousElementSibling;
+            return [
+                ...(historyHeader?.querySelectorAll('button[aria-expanded]') ?? []),
+            ].find(button => button.querySelector('h2')) ?? null;
         }
 
         visibleIds() {
-            return [...document.querySelectorAll(`.${CLASS.itemCheckbox}`)]
+            const historyRoot = document.querySelector(SELECTOR.history);
+            const root = historyRoot ?? document;
+            return [...root.querySelectorAll(`.${CLASS.itemCheckbox}`)]
                 .filter(isVisible)
                 .map(checkbox => checkbox.dataset.conversationId)
                 .filter(Boolean)
