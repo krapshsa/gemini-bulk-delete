@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      3.0.13
+// @version      3.0.14
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -31,11 +31,7 @@
             'button[data-testid*="conversation-options"]',
         ].join(', '),
         menu: '[role="menu"]',
-        deleteAction: [
-            '[role="menuitem"][data-testid*="delete"]',
-            '[role="menu"] button[data-testid*="delete"]',
-        ].join(', '),
-        menuAction: '[role="menuitem"], [role="menu"] button',
+        deleteAction: '[data-testid="delete-chat-menu-item"]',
         dialog: '[role="dialog"]',
         confirm: 'button[data-testid="confirm-button"]',
     };
@@ -383,14 +379,8 @@
         }
 
         deleteActions() {
-            const semantic = [...document.querySelectorAll(SELECTOR.deleteAction)]
+            return [...document.querySelectorAll(SELECTOR.deleteAction)]
                 .filter(isOperable);
-            if (semantic.length > 0) {
-                return semantic;
-            }
-            return [...document.querySelectorAll(SELECTOR.menuAction)].filter(element => {
-                return isOperable(element) && DELETE_TEXT.test(element.textContent.trim());
-            });
         }
 
         confirmButtons() {
