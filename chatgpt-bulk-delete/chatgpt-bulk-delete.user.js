@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      3.0.12
+// @version      3.0.13
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -25,7 +25,6 @@
     };
 
     const SELECTOR = {
-        history: '#history',
         conversation: 'a[href^="/c/"]',
         options: [
             'button[aria-label^="Open conversation options for"]',
@@ -217,11 +216,12 @@
             });
         }
 
+        history() {
+            return document.getElementById('history');
+        }
+
         links() {
-            const historyRoot = document.querySelector(SELECTOR.history);
-            return historyRoot
-                ? [...historyRoot.querySelectorAll(SELECTOR.conversation)]
-                : [];
+            return [...(this.history()?.querySelectorAll(SELECTOR.conversation) ?? [])];
         }
 
         idOf(link) {
@@ -281,10 +281,6 @@
             if (this.toolbar?.isConnected) {
                 return;
             }
-            this.toolbar = null;
-            this.countLabel = null;
-            this.deleteButton = null;
-            this.selectAll = null;
 
             const anchor = this.findToolbarAnchor();
             if (!anchor) {
@@ -333,21 +329,19 @@
         }
 
         findToolbarAnchor() {
-            const historyRoot = document.querySelector(SELECTOR.history);
-            const historyHeader = historyRoot?.previousElementSibling;
-            return [
-                ...(historyHeader?.querySelectorAll('button[aria-expanded]') ?? []),
-            ].find(button => button.querySelector('h2')) ?? null;
+            return this.history()
+                ?.previousElementSibling
+                ?.querySelector('h2')
+                ?.closest('button') ?? null;
         }
 
         visibleIds() {
-            const historyRoot = document.querySelector(SELECTOR.history);
-            const root = historyRoot ?? document;
-            return [...root.querySelectorAll(`.${CLASS.itemCheckbox}`)]
+            const checkboxes = this.history()
+                ?.querySelectorAll(`.${CLASS.itemCheckbox}`) ?? [];
+            return [...checkboxes]
                 .filter(isVisible)
                 .map(checkbox => checkbox.dataset.conversationId)
-                .filter(Boolean)
-                .filter((id, index, ids) => ids.indexOf(id) === index);
+                .filter(Boolean);
         }
 
         render() {
@@ -558,10 +552,5 @@
         }
     }
 
-    const app = new ChatGPTBulkDelete();
-    if (document.readyState === 'loading') {
-        window.addEventListener('DOMContentLoaded', () => app.init(), { once: true });
-    } else {
-        app.init();
-    }
+    new ChatGPTBulkDelete().init();
 })();
