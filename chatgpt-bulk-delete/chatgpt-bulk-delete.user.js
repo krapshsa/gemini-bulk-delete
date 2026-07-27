@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      3.0.20
+// @version      3.0.21
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -224,9 +224,9 @@
             const links = this.getConversationLinks();
 
             for (const link of links) {
-                const id = this.getConversationId(link);
+                const conversationId = this.getConversationId(link);
                 const row = link.parentElement;
-                if (!id || !row) {
+                if (!conversationId || !row) {
                     continue;
                 }
                 link.querySelector(`.${CLASS.itemCheckbox}`)?.remove();
@@ -236,45 +236,45 @@
                 if (
                     !(checkbox instanceof HTMLInputElement)
                     || !checkbox.classList.contains(CLASS.itemCheckbox)
-                    || checkbox.dataset.conversationId !== id
+                    || checkbox.dataset.conversationId !== conversationId
                 ) {
                     if (checkbox?.classList.contains(CLASS.itemCheckbox)) {
                         checkbox.remove();
                     }
-                    checkbox = this.createItemCheckbox(id);
+                    checkbox = this.createConversationCheckbox(conversationId);
                     row.insertBefore(checkbox, link);
                 }
             }
 
-            this.ensureToolbar();
-            this.render();
+            this.ensureSelectionToolbar();
+            this.updateSelectionUI();
         }
 
-        createItemCheckbox(id) {
+        createConversationCheckbox(conversationId) {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.className = `${CLASS.checkbox} ${CLASS.itemCheckbox}`;
-            checkbox.dataset.conversationId = id;
+            checkbox.dataset.conversationId = conversationId;
             for (const eventName of ['pointerdown', 'click']) {
                 checkbox.addEventListener(eventName, event => event.stopPropagation());
             }
             checkbox.addEventListener('change', event => {
                 if (event.currentTarget.checked) {
-                    this.selected.add(id);
+                    this.selected.add(conversationId);
                 } else {
-                    this.selected.delete(id);
+                    this.selected.delete(conversationId);
                 }
-                this.render();
+                this.updateSelectionUI();
             });
             return checkbox;
         }
 
-        ensureToolbar() {
+        ensureSelectionToolbar() {
             if (this.toolbar?.isConnected) {
                 return;
             }
 
-            const anchor = this.findToolbarAnchor();
+            const anchor = this.findSelectionToolbarAnchor();
             if (!anchor) {
                 return;
             }
@@ -286,14 +286,14 @@
             selectAll.setAttribute('aria-label', selectAll.title);
             selectAll.addEventListener('click', event => event.stopPropagation());
             selectAll.addEventListener('change', event => {
-                for (const id of this.getVisibleConversationIds()) {
+                for (const conversationId of this.getVisibleConversationIds()) {
                     if (event.currentTarget.checked) {
-                        this.selected.add(id);
+                        this.selected.add(conversationId);
                     } else {
-                        this.selected.delete(id);
+                        this.selected.delete(conversationId);
                     }
                 }
-                this.render();
+                this.updateSelectionUI();
             });
 
             const countLabel = document.createElement('span');
@@ -304,7 +304,7 @@
             deleteButton.setAttribute('aria-label', deleteButton.title);
             deleteButton.addEventListener('click', event => {
                 event.stopPropagation();
-                void this.deleteSelected();
+                void this.deleteSelectedConversations();
             });
 
             const toolbar = document.createElement('span');
@@ -320,7 +320,7 @@
             this.selectAll = selectAll;
         }
 
-        findToolbarAnchor() {
+        findSelectionToolbarAnchor() {
             return this.getHistoryContainer()
                 ?.previousElementSibling
                 ?.querySelector('h2')
@@ -336,14 +336,14 @@
                 .filter(Boolean);
         }
 
-        render() {
+        updateSelectionUI() {
             for (const link of this.getConversationLinks()) {
-                const id = this.getConversationId(link);
+                const conversationId = this.getConversationId(link);
                 const checkbox = link.previousElementSibling;
-                if (!id || !checkbox?.classList.contains(CLASS.itemCheckbox)) {
+                if (!conversationId || !checkbox?.classList.contains(CLASS.itemCheckbox)) {
                     continue;
                 }
-                const selected = this.selected.has(id);
+                const selected = this.selected.has(conversationId);
                 checkbox.checked = selected;
                 checkbox.disabled = this.running;
                 checkbox.setAttribute(
@@ -365,32 +365,33 @@
             this.deleteButton.disabled = this.running;
             this.toolbar.setAttribute('aria-busy', String(this.running));
 
-            const visibleIds = this.getVisibleConversationIds();
-            const selectedVisible = visibleIds.filter(id => this.selected.has(id)).length;
-            this.selectAll.checked = visibleIds.length > 0
-                && selectedVisible === visibleIds.length;
+            const visibleConversationIds = this.getVisibleConversationIds();
+            const selectedVisible = visibleConversationIds
+                .filter(conversationId => this.selected.has(conversationId)).length;
+            this.selectAll.checked = visibleConversationIds.length > 0
+                && selectedVisible === visibleConversationIds.length;
             this.selectAll.indeterminate = selectedVisible > 0
-                && selectedVisible < visibleIds.length;
-            this.selectAll.disabled = this.running || visibleIds.length === 0;
+                && selectedVisible < visibleConversationIds.length;
+            this.selectAll.disabled = this.running || visibleConversationIds.length === 0;
         }
 
-        getDeleteActions() {
+        getConversationDeleteActions() {
             return [...document.querySelectorAll(SELECTOR.deleteAction)]
                 .filter(isOperable);
         }
 
-        getConfirmDeleteButton() {
+        getConversationDeleteConfirmButton() {
             const button = document.querySelector(SELECTOR.confirmDeleteButton);
             return isOperable(button) ? button : null;
         }
 
-        async submitDelete(id) {
+        async submitConversationDelete(conversationId) {
             let submitted = false;
             try {
                 const link = this.getConversationLinks()
-                    .find(item => this.getConversationId(item) === id);
+                    .find(item => this.getConversationId(item) === conversationId);
                 if (!link) {
-                    throw new Error(`Conversation not found: ${id}`);
+                    throw new Error(`Conversation not found: ${conversationId}`);
                 }
 
                 link.scrollIntoView({ block: 'nearest' });
@@ -405,16 +406,16 @@
                     return isOperable(button) ? button : null;
                 }, 2500, 'conversation options button');
 
-                const oldDeleteActions = new Set(this.getDeleteActions());
+                const oldDeleteActions = new Set(this.getConversationDeleteActions());
                 options.click();
                 const deleteAction = await waitFor(() => {
-                    return this.getDeleteActions()
+                    return this.getConversationDeleteActions()
                         .find(item => !oldDeleteActions.has(item));
                 }, 2500, 'delete menu item');
 
                 deleteAction.click();
                 const confirm = await waitFor(
-                    () => this.getConfirmDeleteButton(),
+                    () => this.getConversationDeleteConfirmButton(),
                     2500,
                     'delete confirmation'
                 );
@@ -472,34 +473,34 @@
             }
         }
 
-        async deleteSelected() {
+        async deleteSelectedConversations() {
             if (this.running || this.selected.size === 0) {
                 return;
             }
 
-            const ids = [...this.selected];
+            const conversationIds = [...this.selected];
             const submitted = new Set();
             const failed = [];
             let halted = '';
             this.running = true;
-            this.render();
+            this.updateSelectionUI();
 
             try {
                 if (!await this.dismissVisibleOverlays()) {
                     halted = 'An existing ChatGPT menu or dialog could not be closed.';
                 } else {
-                    for (const id of ids) {
+                    for (const conversationId of conversationIds) {
                         try {
-                            await this.submitDelete(id);
-                            submitted.add(id);
+                            await this.submitConversationDelete(conversationId);
+                            submitted.add(conversationId);
                         } catch (error) {
-                            console.error('[ChatGPT Bulk Delete]', id, error);
+                            console.error('[ChatGPT Bulk Delete]', conversationId, error);
                             if (error?.deleteSubmitted) {
-                                submitted.add(id);
+                                submitted.add(conversationId);
                                 halted = 'A request was submitted, but ChatGPT did not release the dialog.';
                                 break;
                             }
-                            failed.push(id);
+                            failed.push(conversationId);
                             if (!await this.dismissVisibleOverlays()) {
                                 halted = 'ChatGPT did not return to a safe UI state.';
                                 break;
@@ -508,8 +509,8 @@
                     }
                 }
             } finally {
-                for (const id of submitted) {
-                    this.selected.delete(id);
+                for (const conversationId of submitted) {
+                    this.selected.delete(conversationId);
                 }
                 this.running = false;
                 this.sync();
