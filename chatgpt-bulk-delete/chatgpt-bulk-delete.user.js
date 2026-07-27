@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      3.0.14
+// @version      3.0.15
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -26,10 +26,7 @@
 
     const SELECTOR = {
         conversation: 'a[href^="/c/"]',
-        options: [
-            'button[aria-label^="Open conversation options for"]',
-            'button[data-testid*="conversation-options"]',
-        ].join(', '),
+        options: 'button[data-conversation-options-trigger]',
         menu: '[role="menu"]',
         deleteAction: '[data-testid="delete-chat-menu-item"]',
         dialog: '[role="dialog"]',
@@ -221,7 +218,8 @@
         }
 
         idOf(link) {
-            return link.getAttribute('href')?.match(/^\/c\/([^/?#]+)/)?.[1] ?? null;
+            return link.querySelector(SELECTOR.options)
+                ?.dataset.conversationOptionsTrigger ?? null;
         }
 
         sync() {
@@ -417,8 +415,7 @@
                 }
 
                 const options = await waitFor(() => {
-                    const button = link.parentElement?.querySelector(SELECTOR.options)
-                        ?? link.querySelector(SELECTOR.options);
+                    const button = link.querySelector(SELECTOR.options);
                     return isOperable(button) ? button : null;
                 }, 2500, 'conversation options button');
 
