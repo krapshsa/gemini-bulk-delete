@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Bulk Delete Conversations
 // @namespace    https://chatgpt.com/
-// @version      3.0.15
+// @version      3.0.18
 // @description  Select and bulk delete ChatGPT conversations from the sidebar.
 // @author       vcc
 // @match        https://chatgpt.com/*
@@ -30,10 +30,8 @@
         menu: '[role="menu"]',
         deleteAction: '[data-testid="delete-chat-menu-item"]',
         dialog: '[role="dialog"]',
-        confirm: 'button[data-testid="confirm-button"]',
+        confirmDeleteButton: 'button[data-testid="delete-conversation-confirm-button"]',
     };
-
-    const DELETE_TEXT = /^(Delete|刪除|删除)$/i;
 
     GM_addStyle(`
         .${CLASS.checkbox} {
@@ -381,22 +379,9 @@
                 .filter(isOperable);
         }
 
-        confirmButtons() {
-            const buttons = [];
-            for (const dialog of document.querySelectorAll(SELECTOR.dialog)) {
-                if (!isVisible(dialog)) {
-                    continue;
-                }
-                const semantic = dialog.querySelector(SELECTOR.confirm);
-                const textMatch = [...dialog.querySelectorAll('button')].find(button => {
-                    return isOperable(button) && DELETE_TEXT.test(button.textContent.trim());
-                });
-                const confirm = isOperable(semantic) ? semantic : textMatch;
-                if (confirm) {
-                    buttons.push(confirm);
-                }
-            }
-            return buttons;
+        confirmDeleteButton() {
+            const button = document.querySelector(SELECTOR.confirmDeleteButton);
+            return isOperable(button) ? button : null;
         }
 
         async submitDelete(id) {
@@ -425,11 +410,12 @@
                     return this.deleteActions().find(item => !oldDeleteActions.has(item));
                 }, 2500, 'delete menu item');
 
-                const oldConfirmButtons = new Set(this.confirmButtons());
                 deleteAction.click();
-                const confirm = await waitFor(() => {
-                    return this.confirmButtons().find(item => !oldConfirmButtons.has(item));
-                }, 2500, 'delete confirmation');
+                const confirm = await waitFor(
+                    () => this.confirmDeleteButton(),
+                    2500,
+                    'delete confirmation'
+                );
                 const dialog = confirm.closest(SELECTOR.dialog);
                 if (!dialog) {
                     throw new Error('Delete confirmation dialog was not found');
